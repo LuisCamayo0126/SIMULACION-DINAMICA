@@ -260,6 +260,8 @@ def cliente_process(env, name, server_resource, server_idx, client_idx):
                 hold_end = time.time() + POST_SERVICE_HOLD_REAL
                 visual_server_release[assigned_index] = (name, hold_end)
                 served_visual_hold[name] = hold_end
+                # también registrar en client_records para la vista (sincronizado)
+                client_records[name]["visual_release"] = hold_end
 
 def arrival_generator(env, servers):
     """Generador de llegadas. Asigna cada cliente al servidor con menor carga (cola+ocupado)."""
@@ -493,7 +495,17 @@ def run_pygame():
 
         # Clients that finished (present in visual but not in any sim structures) -> leave
         now_rt = time.time()
-        active_served = set([cid for cid, t in served_hold_snap.items() if t > now_rt])
+        # Build active served set from client_records (single source of truth) or served_hold
+        active_served = set()
+        for cid, rec in records_snap.items():
+            vrel = rec.get("visual_release")
+            if vrel and vrel > now_rt:
+                active_served.add(cid)
+        # fallback to served_hold_snap if needed
+        for cid, t in served_hold_snap.items():
+            if t > now_rt:
+                active_served.add(cid)
+
         in_system = set(qlist) | set([s for s in servers_snap if s is not None]) | active_served
         to_remove = []
         for cid, v in visual_clients.items():
