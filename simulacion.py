@@ -269,14 +269,8 @@ def arrival_generator(env, servers):
         yield env.timeout(inter)
         i += 1
         cname = f"C{i}"
-        # elegir servidor con menor carga (cola + usuarios)
-        loads = []
-        for idx, s in enumerate(servers):
-            qlen = len(getattr(s, 'queue', []))
-            users = len(getattr(s, 'users', []))
-            loads.append((qlen + users, idx))
-        loads.sort()
-        chosen_idx = loads[0][1]
+        # Asignación round-robin para asegurar que todas las cajas atiendan
+        chosen_idx = (i - 1) % len(servers)
         env.process(cliente_process(env, cname, servers[chosen_idx], chosen_idx, i))
 
 
