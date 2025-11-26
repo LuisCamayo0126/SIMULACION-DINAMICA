@@ -485,20 +485,29 @@ def run_pygame():
 
         # Asegurar que cualquier cliente que tenga servidor asignado en client_records
         # se mueva hacia ese servidor (evita quedarse en la fila)
-        for cid, rec in records_snap.items():
-            srv_idx = rec.get("server")
-            if srv_idx is not None:
-                # crear visual client si no existe
-                if cid not in visual_clients:
+        # For any client that has been assigned a server by the sim, ensure it
+        # is removed from the visual queue and moves to the booth.
+        with lock:
+            for cid, rec in records_snap.items():
+                srv_idx = rec.get("server")
+                if srv_idx is not None:
+                    # remove from queue_visual if present (visual sync)
                     try:
-                        client_id_counter_local = int(cid[1:])
+                        if cid in queue_visual:
+                            queue_visual.remove(cid)
                     except Exception:
-                        client_id_counter_local = 0
-                    visual_clients[cid] = VisualClient(cid, 0, client_id_counter_local)
-                # mover al servidor si aún no está moviéndose/atendido
-                vc = visual_clients[cid]
-                if vc.server_index != srv_idx or vc.state == 'queue':
-                    vc.move_to_server(srv_idx)
+                        pass
+                    # ensure visual client exists
+                    if cid not in visual_clients:
+                        try:
+                            client_id_counter_local = int(cid[1:])
+                        except Exception:
+                            client_id_counter_local = 0
+                        visual_clients[cid] = VisualClient(cid, 0, client_id_counter_local)
+                    # mover al servidor si aún no está moviéndose/atendido
+                    vc = visual_clients[cid]
+                    if vc.server_index != srv_idx or vc.state == 'queue':
+                        vc.move_to_server(srv_idx)
 
         # For servers: if a server has a client and that client is not yet at server -> move it
         for i, sid in enumerate(servers_snap):
