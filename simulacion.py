@@ -91,6 +91,12 @@ PROGRESSIVE_INTERARRIVAL = 3.0  # segundos simulados entre llamadas
 # Cada usuario debe demorarse 5 segundos en caja (sim seconds)
 FIXED_SERVICE_TIME = 5.0
 
+# Si deseas que todas las cajas estén atendiendo desde el inicio, puedes
+# especificar un orden inicial de llenado: la lista contiene índices de cajas
+# (0-based). Las primeras `NUM_SERVERS` clientes se asignarán a estas cajas
+# inmediatamente (sin esperar el intervalo progresivo). Cambia esta lista
+# si quieres un patrón específico (p.ej. C1->caja3 sería index 2 primero).
+INITIAL_FILL_ORDER = [2, 1, 0, 3, 4, 5]
 # Visual / juego - MEJORADO CON COLORES GRADIENTES
 WINDOW_W, WINDOW_H = 1000, 700
 FPS = 60
@@ -299,12 +305,25 @@ def arrival_generator(env, servers):
     """Generador de llegadas. Asigna cada cliente al servidor con menor carga (cola+ocupado)."""
     i = 0
     while env.now < SIM_SECONDS:
-        inter = arrival_time(i + 1)
+        # Las primeras `NUM_SERVERS` llegadas las generamos sin espera para
+        # asegurar que todas las cajas queden atendiendo desde el inicio,
+        # usando el `INITIAL_FILL_ORDER` si se proporcionó.
+        if i < NUM_SERVERS:
+            inter = 0
+        else:
+            inter = arrival_time(i + 1)
+
         yield env.timeout(inter)
         i += 1
         cname = f"C{i}"
-        # Asignación round-robin para asegurar que todas las cajas atiendan
-        chosen_idx = (i - 1) % len(servers)
+
+        # elegir índice de cajero: si hay un order inicial, usarlo para las
+        # primeras asignaciones; después, usar round-robin (o la política por defecto)
+        if i <= len(INITIAL_FILL_ORDER):
+            chosen_idx = INITIAL_FILL_ORDER[i - 1]
+        else:
+            chosen_idx = (i - 1) % len(servers)
+
         env.process(cliente_process(env, cname, servers[chosen_idx], chosen_idx, i))
 
 
