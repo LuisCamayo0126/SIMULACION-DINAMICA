@@ -77,7 +77,7 @@ SD_SERVICE = 106.237864          # desviación estándar servicio
 
 NUM_SERVERS = 6                  # cajeros observados en campo
 SIM_SECONDS = 3600               # segundos simulados (ej: 3600 = 1 hora)
-REAL_SECONDS = 120               # duración real esperada (aprox 2 minutos)
+REAL_SECONDS = 60                # duración real esperada (aprox 1 minuto)
 TIME_SCALE = SIM_SECONDS / REAL_SECONDS  # cuántos segundos sim corresponden a 1s real
 
 # Visual / juego - MEJORADO CON COLORES GRADIENTES
@@ -127,8 +127,29 @@ servers_visual = [None] * NUM_SERVERS  # qué cliente atiende cada servidor (id 
 # Después de terminar el servicio, mantener visualmente al cliente unos segundos
 # mientras recibe los medicamentos (real-time seconds)
 served_visual_hold = {}  # cid -> hold_end_real_time
-POST_SERVICE_HOLD_REAL = 1.8
+POST_SERVICE_HOLD_REAL = 2.0
 visual_server_release = {}  # server_index -> (cid, hold_end_real_time)
+
+# Optional TTS announcer (pyttsx3). If not available, audio will be skipped.
+try:
+    import pyttsx3
+except Exception:
+    pyttsx3 = None
+
+def announce_text(text):
+    """Speak the text asynchronously if TTS is available."""
+    if not pyttsx3:
+        return
+    def _run(t):
+        try:
+            engine = pyttsx3.init()
+            engine.say(t)
+            engine.runAndWait()
+            engine.stop()
+        except Exception:
+            pass
+    th = threading.Thread(target=_run, args=(text,), daemon=True)
+    th.start()
 
 # Estadísticas
 stats = {
@@ -165,7 +186,7 @@ def service_time(client_idx):
     s = random.gauss(MEAN_SERVICE, SD_SERVICE)
     return max(5.0, s)
 
-def cliente_process(env, name, server_resource, client_idx):
+def cliente_process(env, name, server_resource, server_idx, client_idx):
     """Proceso SimPy para un cliente."""
     global queue_visual, servers_visual, stats, client_records
     arrive = env.now
@@ -192,27 +213,28 @@ def cliente_process(env, name, server_resource, client_idx):
         if name not in queue_visual:
             queue_visual.append(name)
 
-    # Request a server
+    # Request a server (we requested a specific server resource chosen by the generator)
     with server_resource.request() as req:
-        yield req  # espera en cola a que un servidor se libere
+        yield req  # espera en cola a que ese servidor se libere
 
-        # asignar servidor index (para visual): encuentra primer libre
-        assigned_index = None
+        assigned_index = server_idx
         with lock:
             # registro inicio de servicio
             client_records[name]["start"] = env.now
-            # tomar primer libre
-            for i in range(NUM_SERVERS):
-                if servers_visual[i] is None:
-                    servers_visual[i] = name
-                    assigned_index = i
-                    client_records[name]["server"] = i
-                    break
+            # marcar visualmente el servidor ocupado por este cliente
+            servers_visual[assigned_index] = name
+            client_records[name]["server"] = assigned_index
             # quitar de la cola visual
             try:
                 queue_visual.remove(name)
             except ValueError:
                 pass
+
+        # announce audio (non-blocking)
+        try:
+            announce_text(f"{name} - caja {assigned_index+1}")
+        except Exception:
+            pass
 
         # servicio
         st = service_time(client_idx)
@@ -239,26 +261,35 @@ def cliente_process(env, name, server_resource, client_idx):
                 visual_server_release[assigned_index] = (name, hold_end)
                 served_visual_hold[name] = hold_end
 
-def arrival_generator(env, server_resource):
-    """Generador de llegadas."""
+def arrival_generator(env, servers):
+    """Generador de llegadas. Asigna cada cliente al servidor con menor carga (cola+ocupado)."""
     i = 0
     while env.now < SIM_SECONDS:
         inter = arrival_time(i + 1)
         yield env.timeout(inter)
         i += 1
         cname = f"C{i}"
-        env.process(cliente_process(env, cname, server_resource, i))
+        # elegir servidor con menor carga (cola + usuarios)
+        loads = []
+        for idx, s in enumerate(servers):
+            qlen = len(getattr(s, 'queue', []))
+            users = len(getattr(s, 'users', []))
+            loads.append((qlen + users, idx))
+        loads.sort()
+        chosen_idx = loads[0][1]
+        env.process(cliente_process(env, cname, servers[chosen_idx], chosen_idx, i))
 
 
 def sim_thread_fn():
     """Ejecuta SimPy pero pacing en 'tiempo real' basado en TIME_SCALE."""
     global sim_running, sim_finished, stats
     env = simpy.Environment()
-    server = simpy.Resource(env, capacity=NUM_SERVERS)
+    # crear recursos individuales por cajero para balancear la carga
+    servers = [simpy.Resource(env, capacity=1) for _ in range(NUM_SERVERS)]
 
     # start
     stats["start_sim"] = time.time()
-    env.process(arrival_generator(env, server))
+    env.process(arrival_generator(env, servers))
 
     # Ejecutar event-by-event y "dormir" para sincronizar visualmente:
     prev = env.now
