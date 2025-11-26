@@ -502,37 +502,37 @@ def run_pygame():
             screen.blit(estado, (sx + 12, sy + 32))
 
         # --- VISUAL CLIENTS (icon indicators) ---
-            for cid, vc in visual_clients.items():
-                # Glow effect (mantener para énfasis visual)
-                glow_radius = int(CLIENT_RADIUS * (1 + vc.glow_intensity * 0.3))
-                glow_color = tuple(int(c * 0.5) for c in vc.color)
-                pygame.draw.circle(screen, glow_color, (int(vc.pos[0]), int(vc.pos[1])), glow_radius, 2)
+        for cid, vc in visual_clients.items():
+            # Glow effect (mantener para énfasis visual)
+            glow_radius = int(CLIENT_RADIUS * (1 + vc.glow_intensity * 0.3))
+            glow_color = tuple(int(c * 0.5) for c in vc.color)
+            pygame.draw.circle(screen, glow_color, (int(vc.pos[0]), int(vc.pos[1])), glow_radius, 2)
 
-                # Dibujar icono de usuario centrado en la posición del cliente
-                if user_icon_img:
-                    icon_rect = user_icon_img.get_rect(center=(int(vc.pos[0]), int(vc.pos[1])))
-                    screen.blit(user_icon_img, icon_rect)
-                else:
-                    # Fallback: dibujo circular original si no hay imagen
-                    body_rect = pygame.Rect(0, 0, CLIENT_RADIUS * 2, CLIENT_RADIUS * 2)
-                    body_rect.center = (int(vc.pos[0]), int(vc.pos[1]))
-                    pygame.draw.ellipse(screen, vc.color, body_rect)
-                    pygame.draw.ellipse(screen, (255,255,255), body_rect, 2)
+            # Dibujar icono de usuario centrado en la posición del cliente
+            if user_icon_img:
+                icon_rect = user_icon_img.get_rect(center=(int(vc.pos[0]), int(vc.pos[1])))
+                screen.blit(user_icon_img, icon_rect)
+            else:
+                # Fallback: dibujo circular original si no hay imagen
+                body_rect = pygame.Rect(0, 0, CLIENT_RADIUS * 2, CLIENT_RADIUS * 2)
+                body_rect.center = (int(vc.pos[0]), int(vc.pos[1]))
+                pygame.draw.ellipse(screen, vc.color, body_rect)
+                pygame.draw.ellipse(screen, (255,255,255), body_rect, 2)
 
-                    # Ojos
-                    eye_y = vc.pos[1] - CLIENT_RADIUS * 0.2
-                    eye_x_off = CLIENT_RADIUS * 0.4
-                    pygame.draw.circle(screen, (255,255,255), (int(vc.pos[0] - eye_x_off), int(eye_y)), 3)
-                    pygame.draw.circle(screen, (255,255,255), (int(vc.pos[0] + eye_x_off), int(eye_y)), 3)
+                # Ojos
+                eye_y = vc.pos[1] - CLIENT_RADIUS * 0.2
+                eye_x_off = CLIENT_RADIUS * 0.4
+                pygame.draw.circle(screen, (255,255,255), (int(vc.pos[0] - eye_x_off), int(eye_y)), 3)
+                pygame.draw.circle(screen, (255,255,255), (int(vc.pos[0] + eye_x_off), int(eye_y)), 3)
 
-                    # Boca simple
-                    mouth_y = int(vc.pos[1] + CLIENT_RADIUS * 0.4)
-                    pygame.draw.arc(screen, (20,20,20), (vc.pos[0]-6, mouth_y-4, 12, 8), math.pi, 2*math.pi, 2)
+                # Boca simple
+                mouth_y = int(vc.pos[1] + CLIENT_RADIUS * 0.4)
+                pygame.draw.arc(screen, (20,20,20), (vc.pos[0]-6, mouth_y-4, 12, 8), math.pi, 2*math.pi, 2)
 
-                # Etiqueta pequeña debajo del icono
-                label = font_small.render(cid, True, (200, 200, 200))
-                label_rect = label.get_rect(center=(int(vc.pos[0]), int(vc.pos[1] + CLIENT_RADIUS + 8)))
-                screen.blit(label, label_rect)
+            # Etiqueta pequeña debajo del icono
+            label = font_small.render(cid, True, (200, 200, 200))
+            label_rect = label.get_rect(center=(int(vc.pos[0]), int(vc.pos[1] + CLIENT_RADIUS + 8)))
+            screen.blit(label, label_rect)
 
         # --- PANEL: CLIENTES RECIENTEMENTE ATENDIDOS (AL LADO DE LOS CAJEROS) ---
         # Calculamos un ancho razonable para el panel que quepa a la derecha de los cajeros.
