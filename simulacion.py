@@ -128,6 +128,7 @@ servers_visual = [None] * NUM_SERVERS  # qué cliente atiende cada servidor (id 
 # mientras recibe los medicamentos (real-time seconds)
 served_visual_hold = {}  # cid -> hold_end_real_time
 POST_SERVICE_HOLD_REAL = 1.8
+visual_server_release = {}  # server_index -> (cid, hold_end_real_time)
 
 # Estadísticas
 stats = {
@@ -233,10 +234,10 @@ def cliente_process(env, name, server_resource, client_idx):
             # acumular busy time
             if assigned_index is not None:
                 stats["server_busy_time"][assigned_index] += (t1 - t0)
-                # liberar el servidor visual
-                servers_visual[assigned_index] = None
-                # mantener visualmente al cliente unos segundos más (recepción de medicamentos)
-                served_visual_hold[name] = time.time() + POST_SERVICE_HOLD_REAL
+                # programar liberación visual del servidor después del hold (cliente recibe medicamentos)
+                hold_end = time.time() + POST_SERVICE_HOLD_REAL
+                visual_server_release[assigned_index] = (name, hold_end)
+                served_visual_hold[name] = hold_end
 
 def arrival_generator(env, server_resource):
     """Generador de llegadas."""
@@ -431,11 +432,20 @@ def run_pygame():
             stats_snap = stats.copy()
             records_snap = client_records.copy()
             served_hold_snap = served_visual_hold.copy()
+            visual_server_release_snap = visual_server_release.copy()
             # limpiar expirados (si ya pasó el hold real-time)
             now_rt_lock = time.time()
             for scid, st in list(served_visual_hold.items()):
                 if st <= now_rt_lock:
                     del served_visual_hold[scid]
+            # liberar servidores visualmente cuando expire su hold
+            for sidx, tup in list(visual_server_release.items()):
+                vcid, hold_end = tup
+                if hold_end <= now_rt_lock:
+                    # solo limpiar si el servidor sigue apuntando a ese cliente
+                    if servers_visual[sidx] == vcid:
+                        servers_visual[sidx] = None
+                    del visual_server_release[sidx]
 
         # Update visual clients: ensure all in queue exist
         # add new clients
