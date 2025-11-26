@@ -124,6 +124,11 @@ lock = threading.Lock()
 queue_visual = deque()              # lista de clientes en espera (ids)
 servers_visual = [None] * NUM_SERVERS  # qué cliente atiende cada servidor (id or None)
 
+# Después de terminar el servicio, mantener visualmente al cliente unos segundos
+# mientras recibe los medicamentos (real-time seconds)
+served_visual_hold = {}  # cid -> hold_end_real_time
+POST_SERVICE_HOLD_REAL = 1.8
+
 # Estadísticas
 stats = {
     "arrivals": 0,
@@ -228,7 +233,10 @@ def cliente_process(env, name, server_resource, client_idx):
             # acumular busy time
             if assigned_index is not None:
                 stats["server_busy_time"][assigned_index] += (t1 - t0)
+                # liberar el servidor visual
                 servers_visual[assigned_index] = None
+                # mantener visualmente al cliente unos segundos más (recepción de medicamentos)
+                served_visual_hold[name] = time.time() + POST_SERVICE_HOLD_REAL
 
 def arrival_generator(env, server_resource):
     """Generador de llegadas."""
