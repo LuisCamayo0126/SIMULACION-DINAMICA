@@ -230,6 +230,12 @@ def cliente_process(env, name, server_resource, server_idx, client_idx):
             except ValueError:
                 pass
 
+            # programar hold visual breve (cliente recibe medicamentos visualmente)
+            hold_end_start = time.time() + POST_SERVICE_HOLD_REAL
+            visual_server_release[assigned_index] = (name, hold_end_start)
+            served_visual_hold[name] = hold_end_start
+            client_records[name]["visual_release"] = hold_end_start
+
         # announce audio (non-blocking)
         try:
             announce_text(f"{name} - caja {assigned_index+1}")
@@ -256,12 +262,6 @@ def cliente_process(env, name, server_resource, server_idx, client_idx):
             # acumular busy time
             if assigned_index is not None:
                 stats["server_busy_time"][assigned_index] += (t1 - t0)
-                # programar liberación visual del servidor después del hold (cliente recibe medicamentos)
-                hold_end = time.time() + POST_SERVICE_HOLD_REAL
-                visual_server_release[assigned_index] = (name, hold_end)
-                served_visual_hold[name] = hold_end
-                # también registrar en client_records para la vista (sincronizado)
-                client_records[name]["visual_release"] = hold_end
 
 def arrival_generator(env, servers):
     """Generador de llegadas. Asigna cada cliente al servidor con menor carga (cola+ocupado)."""
