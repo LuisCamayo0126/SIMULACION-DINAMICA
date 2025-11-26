@@ -130,6 +130,15 @@ served_visual_hold = {}  # cid -> hold_end_real_time
 POST_SERVICE_HOLD_REAL = 2.0
 visual_server_release = {}  # server_index -> (cid, hold_end_real_time)
 
+# Debugging flag
+DEBUG = False
+
+def log_debug(*args):
+    if not DEBUG:
+        return
+    ts = datetime.now().strftime('%H:%M:%S')
+    print(f"[DBG {ts}]:", *args)
+
 # Optional TTS announcer (pyttsx3). If not available, audio will be skipped.
 try:
     import pyttsx3
@@ -230,11 +239,15 @@ def cliente_process(env, name, server_resource, server_idx, client_idx):
             except ValueError:
                 pass
 
-            # programar hold visual breve (cliente recibe medicamentos visualmente)
-            hold_end_start = time.time() + POST_SERVICE_HOLD_REAL
+        log_debug(f"assigned {name} to server {assigned_index}")
+
+        # programar hold visual breve (cliente recibe medicamentos visualmente)
+        hold_end_start = time.time() + POST_SERVICE_HOLD_REAL
+        with lock:
             visual_server_release[assigned_index] = (name, hold_end_start)
             served_visual_hold[name] = hold_end_start
             client_records[name]["visual_release"] = hold_end_start
+        log_debug(f"scheduled visual hold for {name} at server {assigned_index} until {hold_end_start:.1f}")
 
         # announce audio (non-blocking)
         try:
@@ -475,6 +488,7 @@ def run_pygame():
                         # also clear server assignment in client_records so visual loop lets them leave
                         if vcid in client_records:
                             client_records[vcid]["server"] = None
+                            log_debug(f"visual hold expired for {vcid} at server {sidx}; server released")
                     del visual_server_release[sidx]
 
         # Update visual clients: ensure all in queue exist
@@ -502,6 +516,7 @@ def run_pygame():
                     try:
                         if cid in queue_visual:
                             queue_visual.remove(cid)
+                            log_debug(f"removed {cid} from queue_visual because server {srv_idx} has called it")
                     except Exception:
                         pass
                     # ensure visual client exists
