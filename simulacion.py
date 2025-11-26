@@ -472,6 +472,9 @@ def run_pygame():
                     # solo limpiar si el servidor sigue apuntando a ese cliente
                     if servers_visual[sidx] == vcid:
                         servers_visual[sidx] = None
+                        # also clear server assignment in client_records so visual loop lets them leave
+                        if vcid in client_records:
+                            client_records[vcid]["server"] = None
                     del visual_server_release[sidx]
 
         # Update visual clients: ensure all in queue exist
@@ -486,11 +489,13 @@ def run_pygame():
         # Asegurar que cualquier cliente que tenga servidor asignado en client_records
         # se mueva hacia ese servidor (evita quedarse en la fila)
         # For any client that has been assigned a server by the sim, ensure it
-        # is removed from the visual queue and moves to the booth.
+        # is removed from the visual queue and moves to the booth. Only do this
+        # while the client is actually being served (i.e., end is not set).
         with lock:
             for cid, rec in records_snap.items():
                 srv_idx = rec.get("server")
-                if srv_idx is not None:
+                end_t = rec.get("end")
+                if srv_idx is not None and end_t is None:
                     # remove from queue_visual if present (visual sync)
                     try:
                         if cid in queue_visual:
