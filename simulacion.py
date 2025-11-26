@@ -97,6 +97,9 @@ FIXED_SERVICE_TIME = 5.0
 # inmediatamente (sin esperar el intervalo progresivo). Cambia esta lista
 # si quieres un patrón específico (p.ej. C1->caja3 sería index 2 primero).
 INITIAL_FILL_ORDER = [2, 1, 0, 3, 4, 5]
+# Si True, en cada ejecución se baraja el orden inicial para que la asignación
+# de las primeras `NUM_SERVERS` clientes sea aleatoria y sin repeticiones.
+RANDOMIZE_INITIAL_ORDER = True
 # Visual / juego - MEJORADO CON COLORES GRADIENTES
 WINDOW_W, WINDOW_H = 1000, 700
 FPS = 60
@@ -301,8 +304,12 @@ def cliente_process(env, name, server_resource, server_idx, client_idx):
             if assigned_index is not None:
                 stats["server_busy_time"][assigned_index] += (t1 - t0)
 
-def arrival_generator(env, servers):
-    """Generador de llegadas. Asigna cada cliente al servidor con menor carga (cola+ocupado)."""
+def arrival_generator(env, servers, initial_order=None):
+    """Generador de llegadas. Asigna cada cliente al servidor con menor carga (cola+ocupado).
+    `initial_order` es una lista de índices de servidores (longitud >= NUM_SERVERS)
+    que controla la asignación de las primeras llegadas para llenar todas las cajas
+    sin repetir servidores.
+    """
     i = 0
     while env.now < SIM_SECONDS:
         # Las primeras `NUM_SERVERS` llegadas las generamos sin espera para
@@ -318,11 +325,13 @@ def arrival_generator(env, servers):
         cname = f"C{i}"
 
         # elegir índice de cajero: si hay un order inicial, usarlo para las
-        # primeras asignaciones; después, usar round-robin (o la política por defecto)
-        if i <= len(INITIAL_FILL_ORDER):
-            chosen_idx = INITIAL_FILL_ORDER[i - 1]
+        # primeras asignaciones; después, elegir aleatoriamente para variar
+        # las llamadas sin repetir usuarios.
+        if initial_order and i <= len(initial_order):
+            chosen_idx = initial_order[i - 1]
         else:
-            chosen_idx = (i - 1) % len(servers)
+            # asignación aleatoria entre cajeros
+            chosen_idx = random.randrange(len(servers))
 
         env.process(cliente_process(env, cname, servers[chosen_idx], chosen_idx, i))
 
@@ -336,7 +345,17 @@ def sim_thread_fn():
 
     # start
     stats["start_sim"] = time.time()
-    env.process(arrival_generator(env, servers))
+    # compute runtime initial order (randomized if configured)
+    if RANDOMIZE_INITIAL_ORDER:
+        try:
+            initial_order_runtime = random.sample(list(range(NUM_SERVERS)), NUM_SERVERS)
+        except Exception:
+            initial_order_runtime = INITIAL_FILL_ORDER[:]
+    else:
+        initial_order_runtime = INITIAL_FILL_ORDER[:]
+
+    log_debug(f"initial_order_runtime={initial_order_runtime}")
+    env.process(arrival_generator(env, servers, initial_order_runtime))
 
     # Ejecutar event-by-event y "dormir" para sincronizar visualmente:
     prev = env.now
