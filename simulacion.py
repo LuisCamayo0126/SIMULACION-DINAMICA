@@ -80,6 +80,14 @@ SIM_SECONDS = 3600               # segundos simulados (ej: 3600 = 1 hora)
 REAL_SECONDS = 60                # duración real esperada (aprox 1 minuto)
 TIME_SCALE = SIM_SECONDS / REAL_SECONDS  # cuántos segundos sim corresponden a 1s real
 
+# Force progressive arrivals and fixed service time options
+# When True, arrivals will be spaced by PROGRESSIVE_INTERARRIVAL (sim seconds)
+FORCE_PROGRESSIVE = True
+PROGRESSIVE_INTERARRIVAL = 1.0  # segundos simulados entre llegadas (progresivo)
+
+# Force every service to last this many simulated seconds (set to None to disable)
+FIXED_SERVICE_TIME = 4.0
+
 # Visual / juego - MEJORADO CON COLORES GRADIENTES
 WINDOW_W, WINDOW_H = 1000, 700
 FPS = 60
@@ -184,6 +192,11 @@ sim_finished = False
 
 def arrival_time(client_idx):
     # Si hay datos reales en Excel, usarlos; sino usar exponencial
+    # If forced progressive arrivals are enabled, return the configured
+    # interarrival (so calls happen progressively and not all at once).
+    if FORCE_PROGRESSIVE:
+        return PROGRESSIVE_INTERARRIVAL
+
     if f"C{client_idx}" in cliente_data:
         return cliente_data[f"C{client_idx}"]["arrival"]
     return random.expovariate(1.0 / MEAN_ARRIVAL)
@@ -192,6 +205,9 @@ def service_time(client_idx):
     # Si hay datos reales en Excel, usarlos; sino usar normal
     if f"C{client_idx}" in cliente_data:
         return cliente_data[f"C{client_idx}"]["service"]
+    # If fixed service time is configured, use it (ensures predictable 4s per user)
+    if FIXED_SERVICE_TIME is not None:
+        return FIXED_SERVICE_TIME
     s = random.gauss(MEAN_SERVICE, SD_SERVICE)
     return max(5.0, s)
 
