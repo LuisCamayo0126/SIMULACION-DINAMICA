@@ -89,7 +89,12 @@ PROGRESSIVE_INTERARRIVAL = 3.0  # segundos simulados entre llamadas
 
 # Force every service to last this many simulated seconds (set to None to disable)
 # Cada usuario debe demorarse 5 segundos en caja (sim seconds)
-FIXED_SERVICE_TIME = 5.0
+FIXED_SERVICE_TIME = 8.0
+
+# Máximo de clientes a procesar en la simulación. Cuando se alcance este
+# número, la llegada de nuevos clientes se detendrá y la simulación finalizará
+# después de que los clientes en servicio terminen.
+MAX_CLIENTS = 71
 
 # Si deseas que todas las cajas estén atendiendo desde el inicio, puedes
 # especificar un orden inicial de llenado: la lista contiene índices de cajas
@@ -311,7 +316,8 @@ def arrival_generator(env, servers, initial_order=None):
     sin repetir servidores.
     """
     i = 0
-    while env.now < SIM_SECONDS:
+    # Stop generating arrivals when we reach SIM_SECONDS or MAX_CLIENTS
+    while env.now < SIM_SECONDS and i < MAX_CLIENTS:
         # Las primeras `NUM_SERVERS` llegadas las generamos sin espera para
         # asegurar que todas las cajas queden atendiendo desde el inicio,
         # usando el `INITIAL_FILL_ORDER` si se proporcionó.
