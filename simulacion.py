@@ -495,7 +495,9 @@ def run_pygame():
             for cid, rec in records_snap.items():
                 srv_idx = rec.get("server")
                 end_t = rec.get("end")
-                if srv_idx is not None and end_t is None:
+                # Only remove/move the client from the queue when the visual server
+                # snapshot actually shows that server is attending that cid (i.e. a call)
+                if srv_idx is not None and end_t is None and servers_snap[srv_idx] == cid:
                     # remove from queue_visual if present (visual sync)
                     try:
                         if cid in queue_visual:
