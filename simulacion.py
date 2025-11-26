@@ -538,6 +538,17 @@ def run_pygame():
                 if sid not in visual_clients:
                     client_id_local = int(sid[1:])
                     visual_clients[sid] = VisualClient(sid, 0, client_id_local)
+                # Ensure client is removed from the queue visual if the server
+                # snapshot shows it is being attended. This is a safety-net for
+                # race conditions where the sim assigned the client but the
+                # earlier removal logic missed it.
+                with lock:
+                    try:
+                        if sid in queue_visual:
+                            queue_visual.remove(sid)
+                            log_debug(f"removed {sid} from queue_visual (server {i} snapshot)")
+                    except ValueError:
+                        pass
                 # move client to server
                 visual_clients[sid].move_to_server(i)
 
