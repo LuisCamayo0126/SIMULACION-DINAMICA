@@ -82,11 +82,14 @@ TIME_SCALE = SIM_SECONDS / REAL_SECONDS  # cuántos segundos sim corresponden a 
 
 # Force progressive arrivals and fixed service time options
 # When True, arrivals will be spaced by PROGRESSIVE_INTERARRIVAL (sim seconds)
+
 FORCE_PROGRESSIVE = True
-PROGRESSIVE_INTERARRIVAL = 1.0  # segundos simulados entre llegadas (progresivo)
+# Cada 3 segundos simulados se llama al siguiente usuario (evita llamados simultáneos)
+PROGRESSIVE_INTERARRIVAL = 3.0  # segundos simulados entre llamadas
 
 # Force every service to last this many simulated seconds (set to None to disable)
-FIXED_SERVICE_TIME = 4.0
+# Cada usuario debe demorarse 5 segundos en caja (sim seconds)
+FIXED_SERVICE_TIME = 5.0
 
 # Visual / juego - MEJORADO CON COLORES GRADIENTES
 WINDOW_W, WINDOW_H = 1000, 700
