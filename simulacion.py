@@ -424,12 +424,18 @@ def run_pygame():
                 running = False
                 break
 
-        # Sync visual state with sim state
+        # Sync visual state with sim state (incluye clientes en hold post-servicio)
         with lock:
             qlist = list(queue_visual)  # snapshot
             servers_snap = servers_visual[:]
             stats_snap = stats.copy()
             records_snap = client_records.copy()
+            served_hold_snap = served_visual_hold.copy()
+            # limpiar expirados (si ya pasó el hold real-time)
+            now_rt_lock = time.time()
+            for scid, st in list(served_visual_hold.items()):
+                if st <= now_rt_lock:
+                    del served_visual_hold[scid]
 
         # Update visual clients: ensure all in queue exist
         # add new clients
@@ -451,7 +457,9 @@ def run_pygame():
                 visual_clients[sid].move_to_server(i)
 
         # Clients that finished (present in visual but not in any sim structures) -> leave
-        in_system = set(qlist) | set([s for s in servers_snap if s is not None])
+        now_rt = time.time()
+        active_served = set([cid for cid, t in served_hold_snap.items() if t > now_rt])
+        in_system = set(qlist) | set([s for s in servers_snap if s is not None]) | active_served
         to_remove = []
         for cid, v in visual_clients.items():
             if cid not in in_system:
