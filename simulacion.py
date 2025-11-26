@@ -297,34 +297,61 @@ class VisualClient:
         self.progress = 0.0
         self.glow_intensity = 0.0
         self.preloaded = False
+        # motion control (pixels per second)
+        self.move_speed = 160.0
+        self._last_time = time.time()
 
     def update_target_for_queue(self, idx):
         self.target_pos = [QUEUE_X, QUEUE_Y + idx * QUEUE_SPACING]
 
     def move_to_server(self, idx):
-        sx = SERVER_X + 50
-        sy = SERVER_Y_START + idx * SERVER_SPACING
+        # target inside the booth rectangle (centered)
+        booth_w = 320
+        booth_h = 70
+        sx = SERVER_X + booth_w // 2
+        sy = SERVER_Y_START + idx * SERVER_SPACING + booth_h // 2
         self.target_pos = [sx, sy]
         self.state = "moving_to_server"
         self.server_index = idx
         self.progress = 0.0
+        self._last_time = time.time()
 
     def leave_system(self):
         # target off-screen to the right
         self.target_pos = [WINDOW_W + 100, random.randint(10, WINDOW_H-10)]
         self.state = "leaving"
         self.progress = 0.0
+        self._last_time = time.time()
 
     def step(self):
-        # interpolación suave
-        self.progress = min(1.0, self.progress + 0.06)
-        self.pos[0] = lerp(self.pos[0], self.target_pos[0], 0.18)
-        self.pos[1] = lerp(self.pos[1], self.target_pos[1], 0.18)
+        # movimiento basado en velocidad (pixels/seg)
+        now = time.time()
+        dt = max(1e-6, now - self._last_time)
+        self._last_time = now
+
+        dx = self.target_pos[0] - self.pos[0]
+        dy = self.target_pos[1] - self.pos[1]
+        dist = math.hypot(dx, dy)
+        if dist > 0.5:
+            # mover hacia target con máxima distancia = speed * dt
+            max_move = self.move_speed * dt
+            move = min(dist, max_move)
+            self.pos[0] += (dx / dist) * move
+            self.pos[1] += (dy / dist) * move
+        else:
+            # llegó al target
+            self.pos[0], self.pos[1] = self.target_pos[0], self.target_pos[1]
+            if self.state == 'moving_to_server':
+                self.state = 'at_server'
+
         # efecto glow
         self.glow_intensity = (math.sin(time.time() * 3) + 1) / 2
         # pequeño balanceo si está en fila para dar vida
         if self.state == 'queue':
             self.pos[1] += math.sin(time.time() * 2 + self.client_idx) * 0.4
+        # ligera oscilación cuando está atendido
+        if self.state == 'at_server':
+            self.pos[1] += math.sin(time.time() * 2 + self.client_idx) * 0.6
 
 def run_pygame():
     global sim_running, sim_finished
