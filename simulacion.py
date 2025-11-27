@@ -84,8 +84,9 @@ TIME_SCALE = SIM_SECONDS / REAL_SECONDS  # cuántos segundos sim corresponden a 
 # When True, arrivals will be spaced by PROGRESSIVE_INTERARRIVAL (sim seconds)
 
 FORCE_PROGRESSIVE = True
-# Cada 3 segundos simulados se llama al siguiente usuario (evita llamados simultáneos)
-PROGRESSIVE_INTERARRIVAL = 3.0  # segundos simulados entre llamadas
+# Intervalo entre llamados expresado en SEGUNDOS REALES (no simulados).
+# Se convertirá a segundos simulados multiplicando por `TIME_SCALE`.
+PROGRESSIVE_INTERARRIVAL_REAL = 3.0  # segundos reales entre llamadas
 
 # Force every service to last this many simulated seconds (set to None to disable)
 # Cada usuario debe demorarse 5 segundos en caja (sim seconds)
@@ -140,7 +141,8 @@ np.random.seed(RANDOM_SEED)
 
 # Mostrar pre-carga visual de clientes desde Excel
 PRELOAD_FROM_EXCEL = True
-PRELOAD_MAX_VISIBLE = 20
+# Reducir la pre-carga visual para no tapar la vista
+PRELOAD_MAX_VISIBLE = 8
 
 # ---------------------------
 # ESTADO COMPARTIDO (entre SimPy y Pygame)
@@ -210,9 +212,11 @@ sim_finished = False
 def arrival_time(client_idx):
     # Si hay datos reales en Excel, usarlos; sino usar exponencial
     # If forced progressive arrivals are enabled, return the configured
-    # interarrival (so calls happen progressively and not all at once).
+    # interarrival converted to SIM seconds (we store the interval as real
+    # seconds so the user-specified 3s is respected visually). Convert with
+    # TIME_SCALE.
     if FORCE_PROGRESSIVE:
-        return PROGRESSIVE_INTERARRIVAL
+        return PROGRESSIVE_INTERARRIVAL_REAL * TIME_SCALE
 
     if f"C{client_idx}" in cliente_data:
         return cliente_data[f"C{client_idx}"]["arrival"]
@@ -318,13 +322,11 @@ def arrival_generator(env, servers, initial_order=None):
     i = 0
     # Stop generating arrivals when we reach SIM_SECONDS or MAX_CLIENTS
     while env.now < SIM_SECONDS and i < MAX_CLIENTS:
-        # Las primeras `NUM_SERVERS` llegadas las generamos sin espera para
-        # asegurar que todas las cajas queden atendiendo desde el inicio,
-        # usando el `INITIAL_FILL_ORDER` si se proporcionó.
-        if i < NUM_SERVERS:
-            inter = 0
-        else:
-            inter = arrival_time(i + 1)
+        # Generamos llegadas siempre respetando el intervalo progresivo (en
+        # segundos reales convertido a sim) para evitar arrastrar muchos
+        # usuarios a la vez. Esto asegura: 1 usuario -> esperar 3s reales ->
+        # siguiente usuario.
+        inter = arrival_time(i + 1)
 
         yield env.timeout(inter)
         i += 1
@@ -659,10 +661,11 @@ def run_pygame():
         screen.blit(sub, (30, 50))
 
         # --- QUEUE AREA (IZQUIERDA) ---
-        # Caja de fila (adaptable al tamaño de ventana)
+        # Caja de fila (adaptable al tamaño de ventana). Se reduce el ancho
+        # para que no tape la vista principal de la simulación.
         qbox_x = 30
         qbox_y = 60
-        qbox_w = 220
+        qbox_w = 140
         qbox_h = WINDOW_H - qbox_y - 180
         pygame.draw.rect(screen, COLOR_PANEL, (qbox_x, qbox_y, qbox_w, qbox_h), border_radius=12)
         pygame.draw.rect(screen, COLOR_PRIMARY, (qbox_x, qbox_y, qbox_w, qbox_h), 3, border_radius=12)
