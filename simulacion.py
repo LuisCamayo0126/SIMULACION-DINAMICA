@@ -662,9 +662,9 @@ def run_pygame():
 
         # --- QUEUE AREA (IZQUIERDA) ---
         # Caja de fila (adaptable al tamaño de ventana). Se reduce el ancho
-        # para que no tape la vista principal de la simulación.
+        # y se baja su posición vertical para que no tape el encabezado.
         qbox_x = 30
-        qbox_y = 60
+        qbox_y = 100
         qbox_w = 140
         qbox_h = WINDOW_H - qbox_y - 180
         pygame.draw.rect(screen, COLOR_PANEL, (qbox_x, qbox_y, qbox_w, qbox_h), border_radius=12)
